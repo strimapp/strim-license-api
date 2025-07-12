@@ -11,18 +11,18 @@ module.exports = async (req, res) => {
 
   if (!license) return res.status(404).json({ valid: false, reason: "Key tidak ditemukan" });
 
-  // Sudah dipakai device lain
-  if (license.activated && license.device_id !== device_id)
+  // ❗ Perbaikan penting di sini:
+  if (license.activated === true && license.device_id && license.device_id !== device_id)
     return res.status(403).json({ valid: false, reason: "Sudah dipakai di device lain" });
 
   const now = new Date();
 
-  // Jika sudah aktif di device yang sama → kirim valid
-  if (license.activated && license.device_id === device_id)
+  // Jika sudah aktif di device yang sama
+  if (license.activated === true && license.device_id === device_id)
     return res.json({ valid: true, expires_at: license.expires_at });
 
   // Pertama kali aktivasi
-  const expiresAt = new Date(now.getTime() + license.duration_days * 86400000); // 30 hari
+  const expiresAt = new Date(now.getTime() + license.duration_days * 86400000);
 
   await licenses.updateOne({ key }, {
     $set: {
