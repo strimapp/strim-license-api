@@ -1,0 +1,11 @@
+{
+  "name": "strim-license-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "mongodb": "^5.7.0"
+  }
+}
