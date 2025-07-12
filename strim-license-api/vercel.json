@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/activate", "destination": "/api/activate.js" },
+    { "source": "/validate", "destination": "/api/validate.js" }
+  ]
+}
