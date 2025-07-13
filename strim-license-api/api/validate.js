@@ -18,7 +18,6 @@ export default async function handler(req, res) {
 
     if (!license) return res.status(200).json({ valid: false, reason: 'Key tidak ditemukan' });
 
-    // ADMIN override
     if (admin_token && admin_token === process.env.ADMIN_TOKEN) {
       return res.status(200).json({ valid: true, expires_at: license.expires_at });
     }
