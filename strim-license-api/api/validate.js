@@ -1,22 +1,41 @@
-const connectDB = require("../db");
+import clientPromise from '../db';
 
-module.exports = async (req, res) => {
-  const { key, device_id } = req.query;
-  if (!key || !device_id) return res.status(400).json({ valid: false });
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "https://admin.strim.my.id");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  const db = await connectDB();
-  const licenses = db.collection("licenses");
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const license = await licenses.findOne({ key });
+  try {
+    const { key, device_id, admin_token } = req.query;
 
-  if (!license || !license.activated || license.device_id !== device_id)
-    return res.status(403).json({ valid: false });
+    if (!key) return res.status(400).json({ valid: false, reason: 'Key tidak ditemukan' });
 
-  const now = new Date();
-  if (new Date(license.expires_at) < now)
-    return res.status(403).json({ valid: false, reason: "Kadaluarsa" });
+    const client = await clientPromise;
+    const db = client.db('strim');
+    const license = await db.collection('licenses').findOne({ key });
 
-  const days_left = Math.ceil((new Date(license.expires_at) - now) / (1000 * 60 * 60 * 24));
+    if (!license) return res.status(200).json({ valid: false, reason: 'Key tidak ditemukan' });
 
-  return res.json({ valid: true, expires_at: license.expires_at, days_left });
-};
+    // ADMIN override
+    if (admin_token && admin_token === process.env.ADMIN_TOKEN) {
+      return res.status(200).json({ valid: true, expires_at: license.expires_at });
+    }
+
+    if (!license.activated) return res.status(200).json({ valid: false, reason: 'Belum diaktivasi' });
+
+    if (!device_id || device_id !== license.device_id) {
+      return res.status(200).json({ valid: false, reason: 'Device tidak cocok' });
+    }
+
+    const now = new Date();
+    if (new Date(license.expires_at) < now) {
+      return res.status(200).json({ valid: false, reason: 'Lisensi sudah expired' });
+    }
+
+    return res.status(200).json({ valid: true, expires_at: license.expires_at });
+  } catch (err) {
+    return res.status(500).json({ error: true, message: err.message });
+  }
+}
