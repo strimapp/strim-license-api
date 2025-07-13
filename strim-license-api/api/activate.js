@@ -1,51 +1,57 @@
-const connectDB = require("../db");
+import clientPromise from '../db';
 
-module.exports = async (req, res) => {
-  const { key, device_id } = req.query;
-  console.log("🔑 Key diterima:", key);
-  console.log("🖥️ Device ID:", device_id);
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "https://admin.strim.my.id");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (!key || !device_id) {
-    console.log("⛔ Key atau device_id tidak dikirim");
-    return res.status(400).json({ valid: false });
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
-  const db = await connectDB();
-  const licenses = db.collection("licenses");
+  try {
+    const { key, device_id } = req.query;
 
-  const license = await licenses.findOne({ key });
-
-  console.log("📄 Data License dari DB:", license);
-
-  if (!license) {
-    console.log("❌ Lisensi tidak ditemukan");
-    return res.status(404).json({ valid: false, reason: "Key tidak ditemukan" });
-  }
-
-  if (license.activated === true && license.device_id && license.device_id !== device_id) {
-    console.log("⚠️ Sudah dipakai di device lain:", license.device_id);
-    return res.status(403).json({ valid: false, reason: "Sudah dipakai di device lain" });
-  }
-
-  const now = new Date();
-
-  if (license.activated === true && license.device_id === device_id) {
-    console.log("✅ Sudah aktif di device yang sama");
-    return res.json({ valid: true, expires_at: license.expires_at });
-  }
-
-  // Aktivasi pertama kali
-  const expiresAt = new Date(now.getTime() + license.duration_days * 86400000);
-
-  await licenses.updateOne({ key }, {
-    $set: {
-      activated: true,
-      device_id,
-      activated_at: now,
-      expires_at: expiresAt
+    if (!key || !device_id) {
+      return res.status(400).json({ valid: false, reason: "Key dan Device ID diperlukan" });
     }
-  });
 
-  console.log("✅ Aktivasi berhasil, expires_at:", expiresAt);
-  return res.json({ valid: true, expires_at: expiresAt });
-};
+    const client = await clientPromise;
+    const db = client.db("strim");
+    const license = await db.collection("licenses").findOne({ key });
+
+    if (!license) {
+      return res.status(404).json({ valid: false, reason: "Lisensi tidak ditemukan" });
+    }
+
+    if (license.activated) {
+      if (license.device_id === device_id) {
+        return res.status(200).json({ valid: true, expires_at: license.expires_at });
+      } else {
+        return res.status(403).json({ valid: false, reason: "Lisensi sudah digunakan di device lain" });
+      }
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + license.duration_days * 24 * 60 * 60 * 1000);
+
+    const result = await db.collection("licenses").updateOne(
+      { key },
+      {
+        $set: {
+          activated: true,
+          device_id,
+          activated_at: now,
+          expires_at: expiresAt,
+        },
+      }
+    );
+
+    if (result.modifiedCount === 1) {
+      return res.status(200).json({ valid: true, expires_at: expiresAt });
+    } else {
+      return res.status(500).json({ valid: false, reason: "Gagal mengaktivasi lisensi" });
+    }
+  } catch (err) {
+    console.error("ACTIVATE ERROR:", err);
+    return res.status(500).json({ error: true, message: err.message });
+  }
+}
