@@ -35,6 +35,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ valid: true, expires_at: license.expires_at });
   } catch (err) {
+    console.error("VALIDATE ERROR:", err);
     return res.status(500).json({ error: true, message: err.message });
   }
 }
