@@ -1,5 +1,6 @@
 import clientPromise from '../db';
-
+console.log("🔒 ENV TOKEN:", process.env.ADMIN_TOKEN);
+console.log("🔑 Query Token:", admin_token);
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "https://admin.strim.my.id");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
